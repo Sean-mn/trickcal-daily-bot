@@ -1,9 +1,11 @@
 import axios from 'axios';
 
 const HEADERS = {
-  Referer: 'https://game.naver.com/lounge/Trickcal/board/11',
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Origin': 'https://game.naver.com',
+  'Referer': 'https://game.naver.com/lounge/Trickcal/board/11',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+  'front-client-platform-type': 'PC',
+  'front-client-product-type': 'web',
 };
 
 export interface NaverPost {
@@ -17,10 +19,7 @@ export async function getLatestPosts(): Promise<NaverPost[]> {
   const apiUrl = process.env.NAVER_BOARD_API_URL;
   if (!apiUrl) throw new Error('NAVER_BOARD_API_URL 환경변수가 설정되지 않았습니다.');
 
-  const res = await axios.get(apiUrl, {
-    headers: HEADERS,
-    params: { page: 1, pageSize: 20, sort: 'new' },
-  });
+  const res = await axios.get(apiUrl, { headers: HEADERS });
 
   // NOTE: 실제 API 응답 구조에 따라 아래 파싱 로직을 수정해야 합니다.
   // DevTools Network 탭에서 응답 JSON을 확인 후 알맞은 필드명으로 교체하세요.

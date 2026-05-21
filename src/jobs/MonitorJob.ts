@@ -23,10 +23,11 @@ async function runMonitor(): Promise<void> {
   for (const post of toNotify.reverse()) {
     const content = await getPostContent(post.id);
     await sendNotification(post, content);
+    await setLastNoticeId(post.id);
     console.log(`[MonitorJob] 알림 전송: ${post.title}`);
   }
 
-  if (newPosts.length > 0) {
+  if (newPosts.length > 0 && toNotify.length === 0) {
     await setLastNoticeId(latestId);
   }
 }
