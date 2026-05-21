@@ -1,0 +1,1 @@
+# trickcal-daily-bot
