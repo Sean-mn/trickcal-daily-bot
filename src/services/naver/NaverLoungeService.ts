@@ -20,25 +20,30 @@ export async function getLatestPosts(): Promise<NaverPost[]> {
   const apiUrl = process.env.NAVER_BOARD_API_URL;
   if (!apiUrl) throw new Error('NAVER_BOARD_API_URL 환경변수가 설정되지 않았습니다.');
 
-  const res = await axios.get(apiUrl, { headers: HEADERS });
+  const urls = apiUrl.split(',').map(u => u.trim()).filter(Boolean);
 
-  const feeds = res.data?.content?.feeds;
+  const results = await Promise.all(urls.map(async (url) => {
+    const res = await axios.get(url, { headers: HEADERS });
+    const feeds = res.data?.content?.feeds;
+    if (!Array.isArray(feeds)) {
+      console.log('[NaverAPI] 예상과 다른 응답:', res.data);
+      return [] as NaverPost[];
+    }
+    return feeds.map((item: any) => {
+      const feed = item.feed;
+      return {
+        id: String(feed.feedId),
+        title: feed.title,
+        createdDate: feed.createdDate,
+        updatedDate: feed.updatedDate,
+        url: `https://game.naver.com/lounge/Trickcal/board/detail/${feed.feedId}`,
+      };
+    });
+  }));
 
-  if (!Array.isArray(feeds)) {
-    console.log('[NaverAPI] 예상과 다른 응답:', res.data);
-    return [];
-  }
-
-  return feeds.map((item: any) => {
-    const feed = item.feed;
-    return {
-      id: String(feed.feedId),
-      title: feed.title,
-      createdDate: feed.createdDate,
-      updatedDate: feed.updatedDate,
-      url: `https://game.naver.com/lounge/Trickcal/board/detail/${feed.feedId}`,
-    };
-  });
+  const merged = results.flat();
+  merged.sort((a, b) => Number(b.id) - Number(a.id));
+  return merged;
 }
 
 // NOTE: 실제 API 응답 구조에 따라 content 필드명을 수정해야 합니다.
