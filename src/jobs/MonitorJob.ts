@@ -22,21 +22,35 @@ async function runMonitor(client: Client<true>): Promise<void> {
   const newPosts = posts.filter(p => Number(p.id) > Number(lastId));
   const toNotify = newPosts.filter(p => matchesFilter(p.title));
 
-  for (const post of toNotify.reverse()) {
-    const content = await getPostContent(post.id);
+  if (toNotify.length > 0) {
     const configs = await getAllGuildConfigs();
-    for (const config of configs) {
-      try {
-        const channel = await client.channels.fetch(config.channelId);
-        if (channel instanceof TextChannel) {
-          await channel.send({ embeds: [buildEmbed(post, content)] });
+    const channels = (
+      await Promise.all(
+        configs.map(async config => {
+          try {
+            const channel = await client.channels.fetch(config.channelId);
+            return channel instanceof TextChannel ? channel : null;
+          } catch (e) {
+            console.error(`[MonitorJob] 채널 페치 실패 (${config.guildId}):`, e);
+            return null;
+          }
+        }),
+      )
+    ).filter((c): c is TextChannel => c !== null);
+
+    for (const post of toNotify.reverse()) {
+      const content = await getPostContent(post.id);
+      const embed = buildEmbed(post, content);
+      for (const channel of channels) {
+        try {
+          await channel.send({ embeds: [embed] });
+        } catch (e) {
+          console.error(`[MonitorJob] 전송 실패 (${channel.guildId}):`, e);
         }
-      } catch (e) {
-        console.error(`[MonitorJob] 채널 전송 실패 (${config.guildId}):`, e);
       }
+      await setLastNoticeId(post.id);
+      console.log(`[MonitorJob] 알림 전송: ${post.title}`);
     }
-    await setLastNoticeId(post.id);
-    console.log(`[MonitorJob] 알림 전송: ${post.title}`);
   }
 
   if (newPosts.length > 0 && toNotify.length === 0) {
