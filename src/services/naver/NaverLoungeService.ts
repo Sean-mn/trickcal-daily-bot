@@ -85,11 +85,10 @@ function extractPreview(html: string): string {
   while ((match = tokenRegex.exec(html)) !== null) {
     if (match[1]) break; // <hr> → 구분선에서 중단
     const text = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '')).replace(/​/g, '').trim();
-    if (!text) continue;
     if (text.startsWith('※')) break;
     lines.push(text);
   }
-  return lines.join('\n\n');
+  return lines.join('\n').trim();
 }
 
 function decodeHtmlEntities(s: string): string {
