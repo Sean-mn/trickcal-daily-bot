@@ -22,9 +22,9 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title;
-            const pattern = /^(feat|fix|docs|refactor|chore|ci|style|test|update|perf)(\([\w/,-]+\))?: .+/;
+            const pattern = /^\[\w[\w/-]*\] .+/;
             if (!pattern.test(title)) {
-              core.setFailed('PR 제목은 Conventional Commits 형식이어야 합니다.\n예: feat(bot): 새 기능 추가');
+              core.setFailed('PR 제목은 [scope] 설명 형식이어야 합니다.\n예: [naver] 네이버 라운지 알림 기능 추가');
             }
 
   build:
