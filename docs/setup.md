@@ -70,7 +70,7 @@ NAVER_ARTICLE_API_BASE_URL=https://comm-api.game.naver.com/.../feed
 ## 3. 슬래시 커맨드 등록
 
 ```bash
-npm run deploy
+npm run deploy:commands
 ```
 
 - `GUILD_ID`가 설정된 경우 해당 서버에만 즉시 등록됩니다 (개발용).
