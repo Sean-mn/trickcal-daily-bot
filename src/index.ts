@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits } from 'discord.js';
+import { startMonitorJob } from './jobs/MonitorJob';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -8,3 +9,5 @@ client.once('ready', () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+startMonitorJob();
