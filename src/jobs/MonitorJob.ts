@@ -1,17 +1,77 @@
 import cron from 'node-cron';
 import { Client, TextChannel } from 'discord.js';
-import { getLatestPosts, getPostContent } from '../services/naver/NaverLoungeService';
-import { getLastNoticeId, setLastNoticeId } from '../services/redis/RedisService';
+import { getLatestPosts, getPostContent, getMaintenanceDetails } from '../services/naver/NaverLoungeService';
+import {
+  getLastNoticeId,
+  setLastNoticeId,
+  getLastMaintenanceId,
+  setLastMaintenanceId,
+  getMaintenanceWindow,
+  setMaintenanceWindow,
+  setMaintenanceActive,
+  isMaintenanceEndNotified,
+  setMaintenanceEndNotified,
+} from '../services/redis/RedisService';
 import { buildEmbed } from '../services/discord/WebhookService';
 import { matchesFilter } from '../config/filters';
 import { getAllGuildConfigs } from '../services/db/GuildConfigService';
+
+function parseMaintenanceTime(text: string): { start: Date; end: Date } | null {
+  const m = text.match(
+    /(\d+)월\s*(\d+)일[^0-9]{0,20}(\d+):(\d+)\s*~\s*(?:(\d+)월\s*(\d+)일[^0-9]{0,20})?(\d+):(\d+)/,
+  );
+  if (!m) return null;
+  const kstNow = new Date(Date.now() + 9 * 3600000);
+  const year = kstNow.getUTCFullYear();
+  const sm = parseInt(m[1]) - 1, sd = parseInt(m[2]), sh = parseInt(m[3]), smin = parseInt(m[4]);
+  const em = m[5] ? parseInt(m[5]) - 1 : sm;
+  const ed = m[6] ? parseInt(m[6]) : sd;
+  const eh = parseInt(m[7]), emin = parseInt(m[8]);
+  return {
+    start: new Date(Date.UTC(year, sm, sd, sh - 9, smin)),
+    end: new Date(Date.UTC(year, em, ed, eh - 9, emin)),
+  };
+}
+
+async function shouldNotifyMaintenanceEnd(): Promise<boolean> {
+  const window = await getMaintenanceWindow();
+  if (!window || new Date() < window.end) return false;
+  return !(await isMaintenanceEndNotified());
+}
+
+async function updateMaintenanceActiveFlag(): Promise<void> {
+  const window = await getMaintenanceWindow();
+  if (!window) { await setMaintenanceActive(false); return; }
+  const now = new Date();
+  await setMaintenanceActive(now >= window.start && now < window.end);
+}
 
 async function runMonitor(client: Client<true>): Promise<void> {
   const posts = await getLatestPosts();
   if (posts.length === 0) return;
 
-  const lastId = await getLastNoticeId();
+  const [lastId, lastMaintenanceId] = await Promise.all([
+    getLastNoticeId(),
+    getLastMaintenanceId(),
+  ]);
   const latestId = posts[0].id;
+
+  // 점검 ID가 없으면 최신 점검 공지로 복구 (최초 실행 및 Redis 초기화 시)
+  if (lastMaintenanceId === null) {
+    const maintenancePost = posts.find(p => p.title.includes('[점검]'));
+    if (maintenancePost) {
+      const details = await getMaintenanceDetails(maintenancePost.id);
+      const parsed = parseMaintenanceTime(details.preview);
+      if (parsed) {
+        await setMaintenanceWindow(parsed.start, parsed.end);
+        await updateMaintenanceActiveFlag();
+        console.log(`[MonitorJob] 점검 일정 복구: ${parsed.start.toISOString()} ~ ${parsed.end.toISOString()}`);
+      }
+      await setLastMaintenanceId(maintenancePost.id);
+    } else {
+      await setLastMaintenanceId('0');
+    }
+  }
 
   if (lastId === null) {
     await setLastNoticeId(latestId);
@@ -21,8 +81,9 @@ async function runMonitor(client: Client<true>): Promise<void> {
 
   const newPosts = posts.filter(p => Number(p.id) > Number(lastId));
   const toNotify = newPosts.filter(p => matchesFilter(p.title));
+  const maintenanceEnded = await shouldNotifyMaintenanceEnd();
 
-  if (toNotify.length > 0) {
+  if (toNotify.length > 0 || maintenanceEnded) {
     const configs = await getAllGuildConfigs();
     const channels = (
       await Promise.all(
@@ -38,9 +99,38 @@ async function runMonitor(client: Client<true>): Promise<void> {
       )
     ).filter((c): c is TextChannel => c !== null);
 
+    if (maintenanceEnded) {
+      await setMaintenanceEndNotified();
+      await setMaintenanceActive(false);
+      for (const ch of channels) {
+        try { await ch.send('✅ 점검이 종료되었습니다.'); }
+        catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패:`, e); }
+      }
+      console.log('[MonitorJob] 점검 종료 알림 전송');
+    }
+
     for (const post of toNotify.reverse()) {
-      const content = await getPostContent(post.id);
-      const embed = buildEmbed(post, content);
+      const is점검 = post.title.includes('[점검]');
+      let content: string;
+      let extraFields: { name: string; value: string }[] | undefined;
+
+      if (is점검) {
+        const details = await getMaintenanceDetails(post.id);
+        content = details.preview;
+        if (details.compensation) {
+          extraFields = [{ name: '📌 점검 보상', value: details.compensation }];
+        }
+        const window = parseMaintenanceTime(details.preview);
+        if (window) {
+          await setMaintenanceWindow(window.start, window.end);
+          await setLastMaintenanceId(post.id);
+          console.log(`[MonitorJob] 점검 일정 저장: ${window.start.toISOString()} ~ ${window.end.toISOString()}`);
+        }
+      } else {
+        content = await getPostContent(post.id);
+      }
+
+      const embed = buildEmbed(post, content, extraFields);
       for (const channel of channels) {
         try {
           await channel.send({ embeds: [embed] });
@@ -56,6 +146,8 @@ async function runMonitor(client: Client<true>): Promise<void> {
   if (newPosts.length > 0 && toNotify.length === 0) {
     await setLastNoticeId(latestId);
   }
+
+  await updateMaintenanceActiveFlag();
 }
 
 export function startMonitorJob(client: Client<true>): void {
