@@ -11,7 +11,8 @@ const HEADERS = {
 export interface NaverPost {
   id: string;
   title: string;
-  writtenAt: string;
+  createdDate: string;
+  updatedDate: string;
   url: string;
 }
 
@@ -21,20 +22,23 @@ export async function getLatestPosts(): Promise<NaverPost[]> {
 
   const res = await axios.get(apiUrl, { headers: HEADERS });
 
-  // NOTE: 실제 API 응답 구조에 따라 아래 파싱 로직을 수정해야 합니다.
-  // DevTools Network 탭에서 응답 JSON을 확인 후 알맞은 필드명으로 교체하세요.
-  const items: any[] =
-    res.data?.result?.articleList ??
-    res.data?.content ??
-    res.data?.articles ??
-    [];
+  const feeds = res.data?.content?.feeds;
 
-  return items.map((item: any) => ({
-    id: String(item.articleId ?? item.id),
-    title: item.subject ?? item.title ?? '',
-    writtenAt: item.regDate ?? item.writtenAt ?? '',
-    url: `https://game.naver.com/lounge/Trickcal/board/11/${item.articleId ?? item.id}`,
-  }));
+  if (!Array.isArray(feeds)) {
+    console.log('[NaverAPI] 예상과 다른 응답:', res.data);
+    return [];
+  }
+
+  return feeds.map((item: any) => {
+    const feed = item.feed;
+    return {
+      id: String(feed.feedId),
+      title: feed.title,
+      createdDate: feed.createdDate,
+      updatedDate: feed.updatedDate,
+      url: `https://game.naver.com/lounge/Trickcal/board/detail/${feed.feedId}`,
+    };
+  });
 }
 
 // NOTE: 실제 API 응답 구조에 따라 content 필드명을 수정해야 합니다.

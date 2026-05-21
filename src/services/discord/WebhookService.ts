@@ -25,7 +25,7 @@ export async function sendNotification(post: NaverPost, content?: string): Promi
         color: COLOR_MAP[postType] ?? COLOR_MAP['공지'],
         fields: [
           { name: '유형', value: postType, inline: true },
-          { name: '작성일', value: post.writtenAt, inline: true },
+          { name: '작성일', value: post.createdDate, inline: true },
         ],
         footer: { text: '트릭컬 리바이브 · 네이버 게임 라운지' },
       },
