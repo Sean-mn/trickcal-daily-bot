@@ -13,7 +13,7 @@ fi
 CURRENT=$(git branch --show-current)
 case "$CURRENT" in
   feature/*)  BASE="develop" ;;
-  develop)    BASE="master" ;;
+  develop)    BASE="main" ;;
   *)          BASE=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo "develop") ;;
 esac
 

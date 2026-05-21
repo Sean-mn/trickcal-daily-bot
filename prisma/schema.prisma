@@ -1,6 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -39,6 +40,13 @@ model Notice {
   id        Int      @id @default(autoincrement())
   sourceId  String   @unique
   createdAt DateTime @default(now())
+
+  @@schema("bot")
+}
+
+model GuildConfig {
+  guildId   String @id
+  channelId String
 
   @@schema("bot")
 }
