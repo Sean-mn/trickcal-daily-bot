@@ -1,3 +1,5 @@
+CREATE SCHEMA IF NOT EXISTS bot;
+
 -- CreateTable
 CREATE TABLE "bot"."CheckItem" (
     "id" SERIAL NOT NULL,
