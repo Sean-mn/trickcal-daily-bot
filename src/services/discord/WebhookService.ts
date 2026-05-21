@@ -24,7 +24,7 @@ export function buildEmbed(post: NaverPost, content?: string): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(post.title)
     .setURL(post.url)
-    .setDescription(content ? `${content}` : null)
+    .setDescription(content ? content.slice(0, 4096) : null)
     .setColor(COLOR_MAP[postType] ?? COLOR_MAP['공지'])
     .addFields(
       { name: '유형', value: postType, inline: true },
