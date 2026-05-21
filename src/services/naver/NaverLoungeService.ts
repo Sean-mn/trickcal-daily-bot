@@ -58,6 +58,7 @@ export async function getPostContent(id: string): Promise<string> {
   return stripHtml(raw).slice(0, 200);
 }
 
-function stripHtml(html: string): string {
+function stripHtml(html: unknown): string {
+  if (typeof html !== 'string') return '';
   return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
