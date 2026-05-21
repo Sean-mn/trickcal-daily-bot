@@ -45,12 +45,15 @@ async function runMonitor(client: Client<true>): Promise<void> {
 }
 
 export function startMonitorJob(client: Client<true>): void {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/3 * * * *', async () => {
     try {
       await runMonitor(client);
-    } catch (err) {
-      console.error('[MonitorJob] 오류 발생:', err);
+    } catch (err: any) {
+      const msg = err?.isAxiosError
+        ? `${err.code ?? 'AXIOS'} - ${err.message} (url: ${err.config?.url})`
+        : String(err);
+      console.error(`[MonitorJob] 오류 발생: ${msg}`);
     }
   });
-  console.log('[MonitorJob] 모니터링 시작 (5분 주기)');
+  console.log('[MonitorJob] 모니터링 시작 (3분 주기)');
 }
