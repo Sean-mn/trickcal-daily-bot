@@ -29,7 +29,10 @@ function parseMaintenanceTime(text: string): { start: Date; end: Date } | null {
   const ed = m[6] ? parseInt(m[6]) : sd;
   const eh = parseInt(m[7]), emin = parseInt(m[8]);
   const start = new Date(Date.UTC(year, sm, sd, sh - 9, smin));
-  const end = new Date(Date.UTC(year, em, ed, eh - 9, emin));
+  let end = new Date(Date.UTC(year, em, ed, eh - 9, emin));
+  if (end.getTime() < start.getTime()) {
+    end = new Date(Date.UTC(year + 1, em, ed, eh - 9, emin));
+  }
   const diff = start.getTime() - Date.now();
   if (diff < -180 * 24 * 3600 * 1000) {
     return {
@@ -109,10 +112,10 @@ async function runMonitor(client: Client<true>): Promise<void> {
         }
         await updateMaintenanceActiveFlag();
         console.log(`[MonitorJob] 점검 일정 복구: ${parsed.start.toISOString()} ~ ${parsed.end.toISOString()}`);
+        await setLastMaintenanceId(maintenancePost.id);
       } else {
         console.warn(`[MonitorJob] 점검 시간 파싱 실패 (본문에서 시간 패턴을 찾지 못함): "${details.preview.slice(0, 80)}"`);
       }
-      await setLastMaintenanceId(maintenancePost.id);
     } else {
       console.log('[MonitorJob] 현재 페이지에 [점검] 포스트 없음 → last-maintenance-id = "0" 설정');
       await setLastMaintenanceId('0');

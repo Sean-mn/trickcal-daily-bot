@@ -30,7 +30,10 @@ export async function getMaintenanceWindow(): Promise<{ start: Date; end: Date }
     redis.get(MAINTENANCE_END_KEY),
   ]);
   if (!startStr || !endStr) return null;
-  return { start: new Date(startStr), end: new Date(endStr) };
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  return { start, end };
 }
 
 export async function setMaintenanceWindow(start: Date, end: Date): Promise<void> {
