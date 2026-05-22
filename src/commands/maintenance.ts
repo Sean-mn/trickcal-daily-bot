@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { getMaintenanceWindow } from '../services/redis/RedisService';
 
 export const data = new SlashCommandBuilder()
@@ -7,14 +7,21 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const window = await getMaintenanceWindow();
+  const now = new Date();
+  const nowTs = Math.floor(now.getTime() / 1000);
 
   if (!window) {
-    await interaction.reply('현재 진행 중인 점검이 없습니다.');
+    const embed = new EmbedBuilder()
+      .setTitle('점검 현황')
+      .setDescription('현재 진행 중인 점검이 없습니다.')
+      .setColor(0x57f287)
+      .addFields({ name: '조회 시각', value: `<t:${nowTs}:F>`, inline: true })
+      .setFooter({ text: '트릭컬 리바이브 · 네이버 게임 라운지' });
+    await interaction.reply({ embeds: [embed] });
     return;
   }
 
   const { start, end } = window;
-  const now = new Date();
   const s = Math.floor(start.getTime() / 1000);
   const e = Math.floor(end.getTime() / 1000);
 
