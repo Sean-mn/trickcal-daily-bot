@@ -155,10 +155,12 @@ async function runMonitor(client: Client<true>): Promise<void> {
 
     if (maintenanceEnded) {
       await setMaintenanceActive(false);
-      for (const ch of channels) {
-        try { await ch.send('✅ 점검이 종료되었습니다.'); }
-        catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패 (channelId=${ch.id}):`, e); }
-      }
+      await Promise.allSettled(
+        channels.map(async (ch) => {
+          try { await ch.send('✅ 점검이 종료되었습니다.'); }
+          catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패 (channelId=${ch.id}):`, e); }
+        }),
+      );
       await setMaintenanceEndNotified();
       console.log('[MonitorJob] 점검 종료 알림 전송 완료');
     }
