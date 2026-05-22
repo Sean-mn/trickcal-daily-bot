@@ -17,5 +17,7 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
     console.log('슬래시 커맨드 등록 완료');
   } catch (error) {
     console.error(error);
+    process.exit(1);
   }
+  process.exit(0);
 })();
