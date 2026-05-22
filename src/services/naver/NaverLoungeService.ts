@@ -72,10 +72,25 @@ export async function getLatestPosts(): Promise<NaverPost[]> {
 export async function getPostContent(id: string): Promise<string> {
   const baseUrl = process.env.NAVER_ARTICLE_API_BASE_URL;
   if (!baseUrl) return '';
-
   const data = await fetchWithRetry<any>(`${baseUrl}/${id}`);
   const html: string = data?.content?.feed?.contents ?? '';
   return extractPreview(html);
+}
+
+export async function getMaintenanceDetails(id: string): Promise<{ preview: string; compensation: string | null }> {
+  const baseUrl = process.env.NAVER_ARTICLE_API_BASE_URL;
+  if (!baseUrl) return { preview: '', compensation: null };
+  const data = await fetchWithRetry<any>(`${baseUrl}/${id}`);
+  const html: string = data?.content?.feed?.contents ?? '';
+  return { preview: extractPreview(html), compensation: extractCompensation(html) };
+}
+
+function extractCompensation(html: string): string | null {
+  const text = decodeHtmlEntities(html.replace(/<[^>]+>/g, ' '));
+  const m = text.match(/엘리프\s*(\d[\d,]*)\s*개?|(\d[\d,]*)\s*엘리프/);
+  if (!m) return null;
+  const n = (m[1] ?? m[2]).replace(/,/g, '');
+  return `엘리프 ${n}개`;
 }
 
 function extractPreview(html: string): string {

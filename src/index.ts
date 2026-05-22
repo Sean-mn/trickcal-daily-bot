@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { startMonitorJob } from './jobs/MonitorJob';
 import { execute as executeSetChannel } from './commands/setChannel';
+import { execute as execute점검 } from './commands/maintenance';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -14,6 +15,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === '알림채널') {
     await executeSetChannel(interaction);
+  } else if (interaction.commandName === '점검') {
+    await execute점검(interaction);
   }
 });
 

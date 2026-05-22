@@ -18,7 +18,11 @@ const COLOR_MAP: Record<string, number> = {
   '공지': 0xfee75c,
 };
 
-export function buildEmbed(post: NaverPost, content?: string): EmbedBuilder {
+export function buildEmbed(
+  post: NaverPost,
+  content?: string,
+  extraFields?: { name: string; value: string; inline?: boolean }[],
+): EmbedBuilder {
   const postType = getPostType(post.title);
 
   const embed = new EmbedBuilder()
@@ -32,6 +36,7 @@ export function buildEmbed(post: NaverPost, content?: string): EmbedBuilder {
     )
     .setFooter({ text: '트릭컬 리바이브 · 네이버 게임 라운지' });
 
+  if (extraFields?.length) embed.addFields(extraFields);
   if (post.imageUrl) embed.setImage(post.imageUrl);
 
   return embed;

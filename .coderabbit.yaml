@@ -1,0 +1,36 @@
+language: "ko-KR"
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - develop
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "!node_modules/**"
+    - "!dist/**"
+    - "!*.lock"
+    - "!package-lock.json"
+  path_instructions:
+    - path: "src/jobs/**"
+      instructions: "스케줄 작업 로직을 집중적으로 검토. 크론 표현식 정확성, 에러 핸들링, 타임존 처리, 중복 실행 방지 여부를 확인."
+    - path: "src/commands/**"
+      instructions: "Discord 슬래시 커맨드 핸들러. 입력값 검증, 권한 체크, 에러 응답 처리를 확인."
+    - path: "src/services/**"
+      instructions: "외부 API 호출 및 비즈니스 로직. 에러 핸들링, 재시도 로직, 타임아웃 처리를 검토."
+    - path: "src/schedulers/**"
+      instructions: "스케줄러 설정. 크론 표현식 정확성과 job 등록 누락 여부를 확인."
+    - path: "prisma/**"
+      instructions: "Prisma 스키마 변경 시 마이그레이션 파일 동반 여부와 인덱스 설계를 검토."
+    - path: "docker/**"
+      instructions: "Docker 설정. 보안 취약점, 불필요한 권한, 이미지 레이어 최적화를 검토."
+
+chat:
+  auto_reply: true
