@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('트릭컬 업데이트 알림을 받을 채널을 설정합니다')
   .addChannelOption(option =>
     option
-      .setName('채널')
+      .setName('채널이름')
       .setDescription('알림을 받을 채널을 선택하세요')
       .addChannelTypes(ChannelType.GuildText)
       .setRequired(true),
@@ -14,7 +14,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const channel = interaction.options.getChannel('채널', true);
+  const channel = interaction.options.getChannel('채널이름', true);
 
   await upsertGuildConfig(interaction.guildId!, channel.id);
   await interaction.reply({ content: `✅ <#${channel.id}> 채널로 알림이 설정됐습니다.`, ephemeral: true });
