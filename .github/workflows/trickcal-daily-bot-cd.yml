@@ -109,8 +109,13 @@ jobs:
             docker compose -f ~/deploy/docker-compose.prod.yml --env-file ~/deploy/.env up -d
 
             sleep 5
-            docker ps | grep trickcal
-            docker logs $(docker ps --filter "name=trickcal" --filter "name=bot" -q | head -1) --tail 20
+            CONTAINER_ID=$(docker ps --filter "name=trickcal" --filter "name=bot" -q | head -1)
+            if [ -z "$CONTAINER_ID" ]; then
+              echo "ERROR: Bot container not running"
+              exit 1
+            fi
+            docker logs "$CONTAINER_ID" --tail 20
+            docker inspect --format='{{.State.Status}}' "$CONTAINER_ID" | grep -q "running" || exit 1
 
   notify:
     runs-on: ubuntu-latest

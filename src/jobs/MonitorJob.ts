@@ -35,15 +35,19 @@ function parseMaintenanceTime(text: string): { start: Date; end: Date } | null {
   }
   const diff = start.getTime() - Date.now();
   if (diff < -180 * 24 * 3600 * 1000) {
-    return {
-      start: new Date(Date.UTC(year + 1, sm, sd, sh - 9, smin)),
-      end: new Date(Date.UTC(year + 1, em, ed, eh - 9, emin)),
-    };
+    const adjStart = new Date(Date.UTC(year + 1, sm, sd, sh - 9, smin));
+    let adjEnd = new Date(Date.UTC(year + 1, em, ed, eh - 9, emin));
+    if (adjEnd.getTime() < adjStart.getTime()) {
+      adjEnd = new Date(Date.UTC(year + 2, em, ed, eh - 9, emin));
+    }
+    return { start: adjStart, end: adjEnd };
   } else if (diff > 180 * 24 * 3600 * 1000) {
-    return {
-      start: new Date(Date.UTC(year - 1, sm, sd, sh - 9, smin)),
-      end: new Date(Date.UTC(year - 1, em, ed, eh - 9, emin)),
-    };
+    const adjStart = new Date(Date.UTC(year - 1, sm, sd, sh - 9, smin));
+    let adjEnd = new Date(Date.UTC(year - 1, em, ed, eh - 9, emin));
+    if (adjEnd.getTime() < adjStart.getTime()) {
+      adjEnd = new Date(Date.UTC(year, em, ed, eh - 9, emin));
+    }
+    return { start: adjStart, end: adjEnd };
   }
   return { start, end };
 }
