@@ -150,7 +150,7 @@ async function runMonitor(client: Client<true>): Promise<void> {
       await Promise.all(
         configs.map(async config => {
           try {
-            const channel = await client.channels.fetch(config.channelId);
+            const channel = client.channels.cache.get(config.channelId) ?? await client.channels.fetch(config.channelId);
             return channel instanceof TextChannel ? channel : null;
           } catch (e) {
             console.error(`[MonitorJob] 채널 페치 실패 (guildId=${config.guildId}, channelId=${config.channelId}):`, e);
@@ -210,13 +210,15 @@ async function runMonitor(client: Client<true>): Promise<void> {
       }
 
       const embed = buildEmbed(post, content, extraFields);
-      for (const channel of channels) {
-        try {
-          await channel.send({ embeds: [embed] });
-        } catch (e) {
-          console.error(`[MonitorJob] 전송 실패 (channelId=${channel.id}, guildId=${channel.guildId}):`, e);
-        }
-      }
+      await Promise.allSettled(
+        channels.map(async (channel) => {
+          try {
+            await channel.send({ embeds: [embed] });
+          } catch (e) {
+            console.error(`[MonitorJob] 전송 실패 (channelId=${channel.id}, guildId=${channel.guildId}):`, e);
+          }
+        }),
+      );
       await setLastNoticeId(post.id);
       console.log(`[MonitorJob] 알림 전송 완료: [${post.id}] ${post.title}`);
     }

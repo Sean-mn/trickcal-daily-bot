@@ -86,7 +86,7 @@ export async function getMaintenanceDetails(id: string): Promise<{ preview: stri
 }
 
 function extractCompensation(html: string): string | null {
-  const text = html.replace(/<[^>]+>/g, ' ');
+  const text = decodeHtmlEntities(html.replace(/<[^>]+>/g, ' '));
   const m = text.match(/엘리프\s*(\d[\d,]*)\s*개?|(\d[\d,]*)\s*엘리프/);
   if (!m) return null;
   const n = (m[1] ?? m[2]).replace(/,/g, '');
