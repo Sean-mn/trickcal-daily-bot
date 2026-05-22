@@ -30,30 +30,38 @@ function parseMaintenanceTime(text: string): { start: Date; end: Date } | null {
   const eh = parseInt(m[7]), emin = parseInt(m[8]);
   const start = new Date(Date.UTC(year, sm, sd, sh - 9, smin));
   const end = new Date(Date.UTC(year, em, ed, eh - 9, emin));
-  if (start.getTime() < Date.now() - 60 * 24 * 3_600_000) {
+  const diff = start.getTime() - Date.now();
+  if (diff < -180 * 24 * 3600 * 1000) {
     return {
       start: new Date(Date.UTC(year + 1, sm, sd, sh - 9, smin)),
       end: new Date(Date.UTC(year + 1, em, ed, eh - 9, emin)),
+    };
+  } else if (diff > 180 * 24 * 3600 * 1000) {
+    return {
+      start: new Date(Date.UTC(year - 1, sm, sd, sh - 9, smin)),
+      end: new Date(Date.UTC(year - 1, em, ed, eh - 9, emin)),
     };
   }
   return { start, end };
 }
 
-async function refreshMaintenanceEndIfActive(): Promise<void> {
+async function refreshMaintenanceEndIfActive(): Promise<Date | null> {
   const [window, lastMaintId] = await Promise.all([
     getMaintenanceWindow(),
     getLastMaintenanceId(),
   ]);
-  if (!window || !lastMaintId || lastMaintId === '0') return;
+  if (!window || !lastMaintId || lastMaintId === '0') return null;
   const now = new Date();
-  if (now < window.start || now >= window.end) return;
+  if (now < window.start || now >= window.end) return null;
 
   const details = await getMaintenanceDetails(lastMaintId);
   const parsed = parseMaintenanceTime(details.preview);
   if (parsed && parsed.end.getTime() !== window.end.getTime()) {
     await updateMaintenanceEnd(parsed.end);
     console.log(`[MonitorJob] 점검 연장 감지: 종료 시간 → ${parsed.end.toISOString()}`);
+    return parsed.end;
   }
+  return null;
 }
 
 async function shouldNotifyMaintenanceEnd(): Promise<boolean> {
@@ -129,13 +137,13 @@ async function runMonitor(client: Client<true>): Promise<void> {
     console.log(`[MonitorJob] 필터 미통과 (알림 안 함): ${skipped.map(p => `"${p.title}"`).join(', ')}`);
   }
 
-  await refreshMaintenanceEndIfActive();
+  const extendedEnd = await refreshMaintenanceEndIfActive();
   const maintenanceEnded = await shouldNotifyMaintenanceEnd();
   if (maintenanceEnded) {
     console.log('[MonitorJob] 점검 종료 시간 경과 → 종료 알림 전송 예정');
   }
 
-  if (toNotify.length > 0 || maintenanceEnded) {
+  if (toNotify.length > 0 || maintenanceEnded || extendedEnd !== null) {
     const configs = await getAllGuildConfigs();
     console.log(`[MonitorJob] 알림 대상 길드 수: ${configs.length}`);
     const channels = (
@@ -152,6 +160,19 @@ async function runMonitor(client: Client<true>): Promise<void> {
       )
     ).filter((c): c is TextChannel => c !== null);
     console.log(`[MonitorJob] 전송 가능한 채널 수: ${channels.length}`);
+
+    if (extendedEnd !== null) {
+      const timeStr = extendedEnd.toLocaleString('ko-KR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul',
+      });
+      await Promise.allSettled(
+        channels.map(async (ch) => {
+          try { await ch.send(`⚠️ 점검이 연장되었습니다. 새로운 종료 예정 시간: ${timeStr}`); }
+          catch (e) { console.error(`[MonitorJob] 점검 연장 알림 전송 실패 (channelId=${ch.id}):`, e); }
+        }),
+      );
+      console.log('[MonitorJob] 점검 연장 알림 전송 완료');
+    }
 
     if (maintenanceEnded) {
       await setMaintenanceActive(false);
