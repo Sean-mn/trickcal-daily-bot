@@ -8,6 +8,7 @@ import {
   setLastMaintenanceId,
   getMaintenanceWindow,
   setMaintenanceWindow,
+  updateMaintenanceEnd,
   setMaintenanceActive,
   isMaintenanceEndNotified,
   setMaintenanceEndNotified,
@@ -27,10 +28,32 @@ function parseMaintenanceTime(text: string): { start: Date; end: Date } | null {
   const em = m[5] ? parseInt(m[5]) - 1 : sm;
   const ed = m[6] ? parseInt(m[6]) : sd;
   const eh = parseInt(m[7]), emin = parseInt(m[8]);
-  return {
-    start: new Date(Date.UTC(year, sm, sd, sh - 9, smin)),
-    end: new Date(Date.UTC(year, em, ed, eh - 9, emin)),
-  };
+  const start = new Date(Date.UTC(year, sm, sd, sh - 9, smin));
+  const end = new Date(Date.UTC(year, em, ed, eh - 9, emin));
+  if (start.getTime() < Date.now() - 60 * 24 * 3_600_000) {
+    return {
+      start: new Date(Date.UTC(year + 1, sm, sd, sh - 9, smin)),
+      end: new Date(Date.UTC(year + 1, em, ed, eh - 9, emin)),
+    };
+  }
+  return { start, end };
+}
+
+async function refreshMaintenanceEndIfActive(): Promise<void> {
+  const [window, lastMaintId] = await Promise.all([
+    getMaintenanceWindow(),
+    getLastMaintenanceId(),
+  ]);
+  if (!window || !lastMaintId || lastMaintId === '0') return;
+  const now = new Date();
+  if (now < window.start || now >= window.end) return;
+
+  const details = await getMaintenanceDetails(lastMaintId);
+  const parsed = parseMaintenanceTime(details.preview);
+  if (parsed && parsed.end.getTime() !== window.end.getTime()) {
+    await updateMaintenanceEnd(parsed.end);
+    console.log(`[MonitorJob] 점검 연장 감지: 종료 시간 → ${parsed.end.toISOString()}`);
+  }
 }
 
 async function shouldNotifyMaintenanceEnd(): Promise<boolean> {
@@ -64,6 +87,9 @@ async function runMonitor(client: Client<true>): Promise<void> {
       const parsed = parseMaintenanceTime(details.preview);
       if (parsed) {
         await setMaintenanceWindow(parsed.start, parsed.end);
+        if (parsed.end <= new Date()) {
+          await setMaintenanceEndNotified();
+        }
         await updateMaintenanceActiveFlag();
         console.log(`[MonitorJob] 점검 일정 복구: ${parsed.start.toISOString()} ~ ${parsed.end.toISOString()}`);
       }
@@ -81,6 +107,7 @@ async function runMonitor(client: Client<true>): Promise<void> {
 
   const newPosts = posts.filter(p => Number(p.id) > Number(lastId));
   const toNotify = newPosts.filter(p => matchesFilter(p.title));
+  await refreshMaintenanceEndIfActive();
   const maintenanceEnded = await shouldNotifyMaintenanceEnd();
 
   if (toNotify.length > 0 || maintenanceEnded) {
@@ -100,12 +127,12 @@ async function runMonitor(client: Client<true>): Promise<void> {
     ).filter((c): c is TextChannel => c !== null);
 
     if (maintenanceEnded) {
-      await setMaintenanceEndNotified();
       await setMaintenanceActive(false);
       for (const ch of channels) {
         try { await ch.send('✅ 점검이 종료되었습니다.'); }
         catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패:`, e); }
       }
+      await setMaintenanceEndNotified();
       console.log('[MonitorJob] 점검 종료 알림 전송');
     }
 
