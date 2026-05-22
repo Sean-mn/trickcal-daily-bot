@@ -71,7 +71,10 @@ async function updateMaintenanceActiveFlag(): Promise<void> {
 
 async function runMonitor(client: Client<true>): Promise<void> {
   const posts = await getLatestPosts();
-  if (posts.length === 0) return;
+  if (posts.length === 0) {
+    console.warn('[MonitorJob] 포스트 조회 결과 없음 (API 응답 비어있음)');
+    return;
+  }
 
   const [lastId, lastMaintenanceId] = await Promise.all([
     getLastNoticeId(),
@@ -79,22 +82,31 @@ async function runMonitor(client: Client<true>): Promise<void> {
   ]);
   const latestId = posts[0].id;
 
+  console.log(`[MonitorJob] 조회된 포스트 수: ${posts.length}, 최신 ID: ${latestId}, last-notice-id: ${lastId ?? 'null'}, last-maintenance-id: ${lastMaintenanceId ?? 'null'}`);
+
   // 점검 ID가 없으면 최신 점검 공지로 복구 (최초 실행 및 Redis 초기화 시)
   if (lastMaintenanceId === null) {
+    console.log('[MonitorJob] last-maintenance-id 없음 → 현재 페이지에서 [점검] 포스트 복구 시도');
     const maintenancePost = posts.find(p => p.title.includes('[점검]'));
     if (maintenancePost) {
+      console.log(`[MonitorJob] [점검] 포스트 발견: id=${maintenancePost.id}, title="${maintenancePost.title}"`);
       const details = await getMaintenanceDetails(maintenancePost.id);
+      console.log(`[MonitorJob] 점검 본문 미리보기: ${details.preview.slice(0, 100).replace(/\n/g, ' ')}`);
       const parsed = parseMaintenanceTime(details.preview);
       if (parsed) {
         await setMaintenanceWindow(parsed.start, parsed.end);
         if (parsed.end <= new Date()) {
           await setMaintenanceEndNotified();
+          console.log('[MonitorJob] 복구된 점검이 이미 종료됨 → end-notified 플래그 설정');
         }
         await updateMaintenanceActiveFlag();
         console.log(`[MonitorJob] 점검 일정 복구: ${parsed.start.toISOString()} ~ ${parsed.end.toISOString()}`);
+      } else {
+        console.warn(`[MonitorJob] 점검 시간 파싱 실패 (본문에서 시간 패턴을 찾지 못함): "${details.preview.slice(0, 80)}"`);
       }
       await setLastMaintenanceId(maintenancePost.id);
     } else {
+      console.log('[MonitorJob] 현재 페이지에 [점검] 포스트 없음 → last-maintenance-id = "0" 설정');
       await setLastMaintenanceId('0');
     }
   }
@@ -107,11 +119,25 @@ async function runMonitor(client: Client<true>): Promise<void> {
 
   const newPosts = posts.filter(p => Number(p.id) > Number(lastId));
   const toNotify = newPosts.filter(p => matchesFilter(p.title));
+
+  console.log(`[MonitorJob] 새 포스트: ${newPosts.length}개, 알림 대상: ${toNotify.length}개`);
+  if (newPosts.length > 0) {
+    console.log(`[MonitorJob] 새 포스트 목록: ${newPosts.map(p => `[${p.id}] ${p.title}`).join(' | ')}`);
+  }
+  if (newPosts.length > toNotify.length) {
+    const skipped = newPosts.filter(p => !matchesFilter(p.title));
+    console.log(`[MonitorJob] 필터 미통과 (알림 안 함): ${skipped.map(p => `"${p.title}"`).join(', ')}`);
+  }
+
   await refreshMaintenanceEndIfActive();
   const maintenanceEnded = await shouldNotifyMaintenanceEnd();
+  if (maintenanceEnded) {
+    console.log('[MonitorJob] 점검 종료 시간 경과 → 종료 알림 전송 예정');
+  }
 
   if (toNotify.length > 0 || maintenanceEnded) {
     const configs = await getAllGuildConfigs();
+    console.log(`[MonitorJob] 알림 대상 길드 수: ${configs.length}`);
     const channels = (
       await Promise.all(
         configs.map(async config => {
@@ -119,21 +145,22 @@ async function runMonitor(client: Client<true>): Promise<void> {
             const channel = await client.channels.fetch(config.channelId);
             return channel instanceof TextChannel ? channel : null;
           } catch (e) {
-            console.error(`[MonitorJob] 채널 페치 실패 (${config.guildId}):`, e);
+            console.error(`[MonitorJob] 채널 페치 실패 (guildId=${config.guildId}, channelId=${config.channelId}):`, e);
             return null;
           }
         }),
       )
     ).filter((c): c is TextChannel => c !== null);
+    console.log(`[MonitorJob] 전송 가능한 채널 수: ${channels.length}`);
 
     if (maintenanceEnded) {
       await setMaintenanceActive(false);
       for (const ch of channels) {
         try { await ch.send('✅ 점검이 종료되었습니다.'); }
-        catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패:`, e); }
+        catch (e) { console.error(`[MonitorJob] 점검 종료 알림 전송 실패 (channelId=${ch.id}):`, e); }
       }
       await setMaintenanceEndNotified();
-      console.log('[MonitorJob] 점검 종료 알림 전송');
+      console.log('[MonitorJob] 점검 종료 알림 전송 완료');
     }
 
     for (const post of toNotify.reverse()) {
@@ -152,6 +179,8 @@ async function runMonitor(client: Client<true>): Promise<void> {
           await setMaintenanceWindow(window.start, window.end);
           await setLastMaintenanceId(post.id);
           console.log(`[MonitorJob] 점검 일정 저장: ${window.start.toISOString()} ~ ${window.end.toISOString()}`);
+        } else {
+          console.warn(`[MonitorJob] [점검] 포스트이나 시간 파싱 실패: id=${post.id}, preview="${details.preview.slice(0, 80)}"`);
         }
       } else {
         content = await getPostContent(post.id);
@@ -162,16 +191,17 @@ async function runMonitor(client: Client<true>): Promise<void> {
         try {
           await channel.send({ embeds: [embed] });
         } catch (e) {
-          console.error(`[MonitorJob] 전송 실패 (${channel.guildId}):`, e);
+          console.error(`[MonitorJob] 전송 실패 (channelId=${channel.id}, guildId=${channel.guildId}):`, e);
         }
       }
       await setLastNoticeId(post.id);
-      console.log(`[MonitorJob] 알림 전송: ${post.title}`);
+      console.log(`[MonitorJob] 알림 전송 완료: [${post.id}] ${post.title}`);
     }
   }
 
   if (newPosts.length > 0 && toNotify.length === 0) {
     await setLastNoticeId(latestId);
+    console.log(`[MonitorJob] 알림 없이 last-notice-id 갱신: ${latestId}`);
   }
 
   await updateMaintenanceActiveFlag();
