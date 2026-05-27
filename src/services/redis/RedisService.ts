@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
+export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
 const LAST_ID_KEY = 'trickcal:last-notice-id';
 const LAST_MAINTENANCE_ID_KEY = 'trickcal:last-maintenance-id';
 const MAINTENANCE_START_KEY = 'trickcal:maintenance-start';

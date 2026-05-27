@@ -94,17 +94,17 @@ jobs:
           script: |
             mkdir -p ~/deploy
 
-            printf 'DISCORD_TOKEN=%s\nCLIENT_ID=%s\nPOSTGRES_PASSWORD=%s\nDATABASE_URL=%s\nREDIS_URL=%s\nDISCORD_WEBHOOK_URL=%s\nNAVER_BOARD_API_URL=%s\nNAVER_ARTICLE_API_BASE_URL=%s\nBOT_IMAGE_TAG=%s\n' \
+            umask 077
+            printf 'DISCORD_TOKEN=%s\nCLIENT_ID=%s\nREDIS_URL=%s\nDISCORD_WEBHOOK_URL=%s\nNAVER_BOARD_API_URL=%s\nNAVER_ARTICLE_API_BASE_URL=%s\nBOT_IMAGE_TAG=%s\n' \
               "${{ secrets.DISCORD_TOKEN }}" \
               "${{ secrets.CLIENT_ID }}" \
-              "${{ secrets.POSTGRES_PASSWORD }}" \
-              "${{ secrets.DATABASE_URL }}" \
               "${{ secrets.REDIS_URL }}" \
               "${{ secrets.DISCORD_WEBHOOK_URL }}" \
               "${{ secrets.NAVER_BOARD_API_URL }}" \
               "${{ secrets.NAVER_ARTICLE_API_BASE_URL }}" \
               "${{ needs.release.outputs.version }}" \
               > ~/deploy/.env
+            chmod 600 ~/deploy/.env
 
             docker compose -f ~/deploy/docker-compose.prod.yml --env-file ~/deploy/.env pull
             docker compose -f ~/deploy/docker-compose.prod.yml --env-file ~/deploy/.env up -d
