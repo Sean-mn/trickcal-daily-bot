@@ -99,7 +99,7 @@ function extractPreview(html: string): string {
   let match;
   while ((match = tokenRegex.exec(html)) !== null) {
     if (match[1]) break; // <hr> → 구분선에서 중단
-    const text = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '')).replace(/​/g, '').trim();
+    const text = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '')).replace(/\\u200B/g, '').trim();
     if (text.startsWith('※')) break;
     lines.push(text);
   }

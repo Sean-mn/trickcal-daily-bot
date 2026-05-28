@@ -76,5 +76,5 @@ Actionable next steps or suggestions based on the research.
 This agent operates in the context of a TypeScript/Discord.js project (trickcal-daily-bot). When research relates to technical topics in this stack, prioritize:
 - Discord.js v14 ecosystem
 - TypeScript/Node.js resources
-- Prisma ORM and PostgreSQL
+- Redis (AOF persistence)
 - Discord API security advisories
