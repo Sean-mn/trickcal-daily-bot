@@ -22,7 +22,6 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Calculate Version
         id: version
@@ -95,11 +94,10 @@ jobs:
             mkdir -p ~/deploy
 
             umask 077
-            printf 'DISCORD_TOKEN=%s\nCLIENT_ID=%s\nREDIS_URL=%s\nDISCORD_WEBHOOK_URL=%s\nNAVER_BOARD_API_URL=%s\nNAVER_ARTICLE_API_BASE_URL=%s\nBOT_IMAGE_TAG=%s\n' \
+            printf 'DISCORD_TOKEN=%s\nCLIENT_ID=%s\nREDIS_URL=%s\nNAVER_BOARD_API_URL=%s\nNAVER_ARTICLE_API_BASE_URL=%s\nBOT_IMAGE_TAG=%s\n' \
               "${{ secrets.DISCORD_TOKEN }}" \
               "${{ secrets.CLIENT_ID }}" \
               "${{ secrets.REDIS_URL }}" \
-              "${{ secrets.DISCORD_WEBHOOK_URL }}" \
               "${{ secrets.NAVER_BOARD_API_URL }}" \
               "${{ secrets.NAVER_ARTICLE_API_BASE_URL }}" \
               "${{ needs.release.outputs.version }}" \
