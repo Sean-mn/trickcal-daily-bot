@@ -13,7 +13,8 @@
 봇이 게시판을 읽어오기 위한 URL을 한 번만 확인해야 합니다.
 
 1. Chrome에서 아래 URL 접속
-   ```
+
+   ```text
    https://game.naver.com/lounge/Trickcal/board/11
    ```
 
@@ -48,12 +49,6 @@ CLIENT_ID=
 # 로컬 개발 전용: 슬래시 커맨드를 특정 서버에 즉시 등록할 때만 사용
 # 배포 환경에서는 생략 (글로벌 커맨드로 등록됨, 반영까지 최대 1시간)
 GUILD_ID=
-
-# PostgreSQL 비밀번호
-POSTGRES_PASSWORD=your_password
-
-# PostgreSQL 접속 URL (POSTGRES_PASSWORD와 동일하게 입력)
-DATABASE_URL=postgresql://postgres:your_password@db:5432/trickcal_bot?schema=bot
 
 # Redis 접속 URL (기본값 그대로 사용 가능)
 REDIS_URL=redis://redis:6379
@@ -92,8 +87,8 @@ docker-compose up -d
 # 의존성 설치
 npm install
 
-# Docker로 PostgreSQL + Redis만 실행
-docker-compose up -d db redis
+# Docker로 Redis만 실행
+docker-compose up -d redis
 
 # 봇 실행
 npm run dev
@@ -105,7 +100,7 @@ npm run dev
 
 봇이 실행된 후, 알림을 받을 Discord 서버에서 아래 슬래시 커맨드를 실행합니다.
 
-```
+```text
 /알림채널 채널이름: 공지
 ```
 
@@ -118,7 +113,7 @@ npm run dev
 
 봇 실행 직후 터미널에 아래 로그가 출력되면 정상입니다.
 
-```
+```text
 [MonitorJob] 모니터링 시작 (3분 주기)
 [MonitorJob] 초기화 완료. 기준 ID: 12345
 ```

@@ -1,6 +1,16 @@
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
+export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+  connectTimeout: 10_000,
+  maxRetriesPerRequest: 3,
+  retryStrategy(times) {
+    return Math.min(times * 200, 2_000);
+  },
+});
+
+redis.on('error', (error) => {
+  console.error('[RedisService] Redis connection error', error);
+});
 const LAST_ID_KEY = 'trickcal:last-notice-id';
 const LAST_MAINTENANCE_ID_KEY = 'trickcal:last-maintenance-id';
 const MAINTENANCE_START_KEY = 'trickcal:maintenance-start';

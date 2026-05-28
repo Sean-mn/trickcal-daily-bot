@@ -1,3 +1,4 @@
+import axios from 'axios';
 import cron from 'node-cron';
 import { Client, TextChannel } from 'discord.js';
 import { getLatestPosts, getPostContent, getMaintenanceDetails } from '../services/naver/NaverLoungeService';
@@ -144,6 +145,19 @@ async function runMonitor(client: Client<true>): Promise<void> {
     console.log(`[MonitorJob] 필터 미통과 (알림 안 함): ${skipped.map(p => `"${p.title}"`).join(', ')}`);
   }
 
+  // 새 [점검] 포스트를 먼저 처리해 점검 윈도우를 갱신한 뒤 종료 여부를 판단
+  for (const post of toNotify) {
+    if (post.title.includes('[점검]')) {
+      const details = await getMaintenanceDetails(post.id);
+      const parsed = parseMaintenanceTime(details.preview);
+      if (parsed) {
+        await setMaintenanceWindow(parsed.start, parsed.end);
+        await setLastMaintenanceId(post.id);
+        break; // toNotify는 최신순이므로 첫 매치만 반영
+      }
+    }
+  }
+
   const extendedEnd = await refreshMaintenanceEndIfActive();
   const maintenanceEnded = await shouldNotifyMaintenanceEnd();
   if (maintenanceEnded) {
@@ -217,17 +231,21 @@ async function runMonitor(client: Client<true>): Promise<void> {
       }
 
       const embed = buildEmbed(post, content, extraFields);
-      await Promise.allSettled(
-        channels.map(async (channel) => {
-          try {
-            await channel.send({ embeds: [embed] });
-          } catch (e) {
-            console.error(`[MonitorJob] 전송 실패 (channelId=${channel.id}, guildId=${channel.guildId}):`, e);
-          }
-        }),
+      const sendResults = await Promise.allSettled(
+        channels.map((channel) => channel.send({ embeds: [embed] })),
       );
-      await setLastNoticeId(post.id);
-      console.log(`[MonitorJob] 알림 전송 완료: [${post.id}] ${post.title}`);
+      sendResults.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.error(`[MonitorJob] 전송 실패 (channelId=${channels[i].id}, guildId=${channels[i].guildId}):`, r.reason);
+        }
+      });
+      const successCount = sendResults.filter(r => r.status === 'fulfilled').length;
+      if (successCount > 0) {
+        await setLastNoticeId(post.id);
+        console.log(`[MonitorJob] 알림 전송 완료 (${successCount}/${sendResults.length} 성공): [${post.id}] ${post.title}`);
+      } else {
+        console.warn(`[MonitorJob] 모든 채널 전송 실패로 last-notice-id 미갱신: [${post.id}] ${post.title}`);
+      }
     }
   }
 
@@ -239,15 +257,24 @@ async function runMonitor(client: Client<true>): Promise<void> {
   await updateMaintenanceActiveFlag();
 }
 
+let isMonitorRunning = false;
+
 export function startMonitorJob(client: Client<true>): void {
   cron.schedule('*/3 * * * *', async () => {
+    if (isMonitorRunning) {
+      console.warn('[MonitorJob] 이전 실행이 아직 진행 중이어서 이번 tick은 건너뜁니다.');
+      return;
+    }
+    isMonitorRunning = true;
     try {
       await runMonitor(client);
-    } catch (err: any) {
-      const msg = err?.isAxiosError
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err)
         ? `${err.code ?? 'AXIOS'} - ${err.message} (url: ${err.config?.url})`
         : String(err);
       console.error(`[MonitorJob] 오류 발생: ${msg}`);
+    } finally {
+      isMonitorRunning = false;
     }
   });
   console.log('[MonitorJob] 모니터링 시작 (3분 주기)');

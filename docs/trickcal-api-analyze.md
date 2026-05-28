@@ -1,4 +1,5 @@
 # 트릭컬 노트 API/데이터 구조 파악 결과
+
 실제 API 엔드포인트:
 
 https://api.note.trickcal.com/note/data — 유저 저장 데이터 불러오기 (쿠키 인증 필요)
@@ -6,6 +7,7 @@ https://api.note.trickcal.com/note/signout — 로그아웃 (POST)
 https://api.note.trickcal.com/note/revoke-all — 전체 세션 해제 (POST)
 
 ## 중요한 점
+
 게임 데이터(사도 정보, 보드, 장비, 연구 등)는 JS 번들에 내장되어 있고, /note/data API는 개인 유저 저장 데이터(보유 사도, 보드 진행 상황 등)를 주고받는 구조입니다. 이 API는 쿠키 기반 인증을 사용하므로, 외부에서 공개 API처럼 자유롭게 호출하기는 어렵습니다.
 
 디스코드 봇에 활용 가능한 기능 아이디어
@@ -18,6 +20,7 @@ https://api.note.trickcal.com/note/revoke-all — 전체 세션 해제 (POST)
 
 
 ## 추천 구현 우선순위
+
 인증 없이 바로 구현 가능하고 유용한 것들부터 하면 이렇습니다.
 
 사도 정보 카드 — 사도 이름 검색 시 성격, 종족, 성급, 이미지를 임베드로 표시
