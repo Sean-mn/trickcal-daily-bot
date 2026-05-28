@@ -13,6 +13,7 @@
 봇이 게시판을 읽어오기 위한 URL을 한 번만 확인해야 합니다.
 
 1. Chrome에서 아래 URL 접속
+
    ```text
    https://game.naver.com/lounge/Trickcal/board/11
    ```

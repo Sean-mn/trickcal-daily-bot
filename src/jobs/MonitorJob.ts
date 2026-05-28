@@ -1,3 +1,4 @@
+import axios from 'axios';
 import cron from 'node-cron';
 import { Client, TextChannel } from 'discord.js';
 import { getLatestPosts, getPostContent, getMaintenanceDetails } from '../services/naver/NaverLoungeService';
@@ -238,11 +239,12 @@ async function runMonitor(client: Client<true>): Promise<void> {
           console.error(`[MonitorJob] 전송 실패 (channelId=${channels[i].id}, guildId=${channels[i].guildId}):`, r.reason);
         }
       });
-      if (sendResults.every(r => r.status === 'fulfilled')) {
+      const successCount = sendResults.filter(r => r.status === 'fulfilled').length;
+      if (successCount > 0) {
         await setLastNoticeId(post.id);
-        console.log(`[MonitorJob] 알림 전송 완료: [${post.id}] ${post.title}`);
+        console.log(`[MonitorJob] 알림 전송 완료 (${successCount}/${sendResults.length} 성공): [${post.id}] ${post.title}`);
       } else {
-        console.warn(`[MonitorJob] 일부 채널 전송 실패로 last-notice-id 미갱신: [${post.id}] ${post.title}`);
+        console.warn(`[MonitorJob] 모든 채널 전송 실패로 last-notice-id 미갱신: [${post.id}] ${post.title}`);
       }
     }
   }
@@ -266,8 +268,8 @@ export function startMonitorJob(client: Client<true>): void {
     isMonitorRunning = true;
     try {
       await runMonitor(client);
-    } catch (err: any) {
-      const msg = err?.isAxiosError
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err)
         ? `${err.code ?? 'AXIOS'} - ${err.message} (url: ${err.config?.url})`
         : String(err);
       console.error(`[MonitorJob] 오류 발생: ${msg}`);
