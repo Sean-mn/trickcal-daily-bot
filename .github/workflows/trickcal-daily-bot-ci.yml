@@ -1,0 +1,95 @@
+name: trickcal daily bot CI Workflow
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Validate PR Title
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const pattern = /^\[\w[\w/-]*\] .+/;
+            if (!pattern.test(title)) {
+              core.setFailed('PR 제목은 [scope] 설명 형식이어야 합니다.\n예: [naver] 네이버 라운지 알림 기능 추가');
+            }
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [validate-title]
+    if: >
+      always() &&
+      (needs.validate-title.result == 'success' || needs.validate-title.result == 'skipped')
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [validate-title, build]
+    if: always()
+
+    steps:
+      - name: Get Short SHA
+        id: sha
+        run: echo "short=$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Determine Status
+        id: status
+        run: |
+          if [[ "${{ needs.validate-title.result }}" == "failure" ]] || \
+             [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "color=0xFF4C4C" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.build.result }}" == "success" ]] || \
+               [[ "${{ needs.build.result }}" == "skipped" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "color=0x4CAF50" >> $GITHUB_OUTPUT
+          else
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+            echo "color=0xFFA500" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord Notification
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708
+        with:
+          webhook: ${{ secrets.DISCORD_CI_WEBHOOK }}
+          status: ${{ steps.status.outputs.status }}
+          color: ${{ steps.status.outputs.color }}
+          title: "trickcal-daily-bot CI"
+          description: |
+            `${{ github.ref_name }}` · `${{ steps.sha.outputs.short }}` · by **${{ github.actor }}**
+            ─────────────────────────────
+            **Validate Title:** ${{ needs.validate-title.result }}
+            **Build:** ${{ needs.build.result }}
