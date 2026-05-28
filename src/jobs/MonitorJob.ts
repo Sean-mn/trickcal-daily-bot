@@ -128,12 +128,11 @@ async function runMonitor(client: Client<true>): Promise<void> {
   }
 
   if (lastId === null) {
-    await setLastNoticeId(latestId);
-    console.log(`[MonitorJob] 초기화 완료. 기준 ID: ${latestId}`);
-    return;
+    console.log(`[MonitorJob] 최초 실행: 최신 포스트 알림 전송 후 기준 ID 등록`);
   }
+  const effectiveLastId = lastId ?? String(Number(latestId) - 1);
 
-  const newPosts = posts.filter(p => Number(p.id) > Number(lastId));
+  const newPosts = posts.filter(p => Number(p.id) > Number(effectiveLastId));
   const toNotify = newPosts.filter(p => matchesFilter(p.title));
 
   console.log(`[MonitorJob] 새 포스트: ${newPosts.length}개, 알림 대상: ${toNotify.length}개`);
