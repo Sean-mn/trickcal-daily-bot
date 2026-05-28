@@ -152,6 +152,7 @@ async function runMonitor(client: Client<true>): Promise<void> {
       if (parsed) {
         await setMaintenanceWindow(parsed.start, parsed.end);
         await setLastMaintenanceId(post.id);
+        break; // toNotify는 최신순이므로 첫 매치만 반영
       }
     }
   }
